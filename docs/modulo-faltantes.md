@@ -314,6 +314,6 @@ Incluye:
 
 ## E. Estrategia técnica aplicada en este repositorio
 
-Como el repositorio no contiene una aplicación existente, la Fase 1 se implementa como una app web estática, responsive y sin dependencias externas. Esto permite validar el flujo operativo rápidamente desde celulares, sin introducir un ERP ni infraestructura pesada.
+Como el repositorio no contiene una aplicación existente, la Fase 1 se implementa como una app web modular, responsive e instalable como PWA básica. La implementación evita un ERP pesado, pero ya contempla volumen operativo: catálogo de 8.200 productos, búsqueda en Web Worker para no bloquear celulares e IndexedDB para guardar muchas operaciones de faltantes localmente.
 
-La app usa `localStorage` como persistencia de prototipo. En una siguiente iteración, las funciones de almacenamiento se pueden reemplazar por llamadas a una API sin rediseñar el flujo de usuario.
+La app mantiene separadas las capas de catálogo, búsqueda, dominio, almacenamiento e interfaz. En una siguiente iteración, `storage.js` puede reemplazarse por una API/backend sin rediseñar el flujo de usuario ni la experiencia operativa.

@@ -1,1 +1,1 @@
-{"scripts":{"test":"node tests/app.test.js"},"devDependencies":{}}
+{"type":"module","scripts":{"test":"node tests/app.test.js"},"devDependencies":{}}

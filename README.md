@@ -1,39 +1,53 @@
-# PEDIDOS ALVARO
+# Pedidos Alvaro — Gestión de ferretería
 
-App interna para reemplazar el cuaderno físico de faltantes de una ferretería/retail y preparar pedidos por proveedor sin construir un ERP pesado.
+Sistema interno para administrar una ferretería: registrar faltantes, armar pedidos por proveedor y gestionar usuarios, **compartido en tiempo real entre todos los empleados** desde el celular o la PC.
 
-## Qué incluye esta versión
+No es una tienda para clientes: es la herramienta de trabajo interna del negocio.
 
-- App web responsive instalable como PWA básica.
-- Catálogo operativo generado con **8.200 productos** para validar volumen realista.
-- Búsqueda rápida por nombre oficial, alias, marca, categoría, código interno, código de barras y proveedor.
-- Búsqueda en `Web Worker` para no bloquear la interfaz en celulares.
-- Persistencia local robusta en `IndexedDB` para soportar muchas operaciones de faltantes.
-- Registro de faltantes clasificados o pendientes de clasificar.
-- Lista filtrable por texto, estado y urgencia.
-- Métricas operativas: total, pendientes, urgentes y sin clasificar.
+## Módulos de esta versión
 
-## Ejecutar la app
+- **Faltantes** — cuaderno digital: buscador rápido de productos (nombre, alias, marca, código, código de barras, proveedor), registro en segundos, lista filtrable y métricas.
+- **Pedidos** — agrupa los faltantes por proveedor y arma el pedido con un clic, con texto listo para enviar por **WhatsApp**.
+- **Usuarios y roles** — login y permisos: **administrador**, **encargado** y **trabajador**.
 
-Por seguridad de los navegadores con módulos y workers, abrirla con un servidor estático:
+## Dos modos de funcionamiento
+
+- **Modo demostración** (sin configurar nada): la app funciona, pero los datos se guardan solo en ese dispositivo. Ideal para probar.
+- **Modo real** (con Supabase): base de datos en la nube + login, datos compartidos entre todos. Ver guía abajo.
+
+## Puesta en marcha (paso a paso, sin tecnicismos)
+
+👉 **`docs/setup-supabase.md`** — crear el proyecto en Supabase, cargar la base de datos, conectar la app, crear usuarios y publicarla en internet.
+
+El esquema de base de datos listo para ejecutar está en **`supabase/schema.sql`**.
+
+## Probar localmente
 
 ```bash
 python3 -m http.server 4173 -d src
+# abrir http://localhost:4173
 ```
 
-Luego entrar a:
-
-```text
-http://localhost:4173
-```
-
-## Probar
+## Tests
 
 ```bash
 npm test
 ```
 
-## Documentación
+## Estructura del código
 
-- `docs/modulo-faltantes.md`: diagnóstico, diseño funcional, diseño de datos y plan por fases.
-- `docs/database-schema.sql`: esquema SQL propuesto para backend futuro.
+- `src/config.js` — credenciales de Supabase y nombre del negocio.
+- `src/supabase.js` / `src/auth.js` — conexión y autenticación (con fallback a modo demostración).
+- `src/storage.js` — capa de datos con dos motores: Supabase y localStorage.
+- `src/domain.js` — lógica de negocio (faltantes, pedidos, roles, WhatsApp).
+- `src/search.js` / `src/search-worker.js` — búsqueda de catálogo en Web Worker.
+- `src/views/` — pantallas: login, faltantes, pedidos, usuarios.
+- `src/app.js` — navegación y orquestación.
+
+## Próximas fases
+
+- Importar el catálogo real de productos desde el facturador (Excel/CSV).
+- Gestión de proveedores y relación producto-proveedor.
+- Importación de facturas y recomendaciones de compra.
+
+Diagnóstico, diseño funcional y plan completo en `docs/modulo-faltantes.md`.

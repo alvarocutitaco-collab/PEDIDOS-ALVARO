@@ -1,113 +1,176 @@
-import { products } from './catalog.js';
-import { normalizeText, buildSearchIndex, searchProducts } from './search.js';
-import { STATUSES, createShortage, productLabel } from './domain.js';
-import { getAllShortages, saveShortage, updateShortage } from './storage.js';
+import { sampleProducts } from './catalog.js';
+import { buildSearchIndex, searchProducts } from './search.js';
+import { BUSINESS_NAME } from './config.js';
+import { initAuth, onAuthChange, signIn, signUp, signOut, getMode } from './auth.js';
+import * as store from './storage.js';
+import { canManageUsers, canManageOrders } from './domain.js';
+import { renderLogin } from './views/login.js';
+import { renderFaltantes } from './views/faltantes.js';
+import { renderPedidos } from './views/pedidos.js';
+import { renderUsuarios } from './views/usuarios.js';
+import { renderImportar } from './views/importar.js';
+import { escapeHtml, toast } from './ui.js';
 
-const state = { selectedProduct: null, results: [], shortages: [], workerReady: false, requestId: 0, fallbackIndex: buildSearchIndex(products) };
-const $ = id => document.getElementById(id);
-const worker = 'Worker' in window ? new Worker('./search-worker.js', { type: 'module' }) : null;
+const appEl = document.getElementById('app');
+const state = { view: 'faltantes', shortages: [], orders: [], suppliers: [], users: [], ui: {} };
+let currentUser = null;
 
-if (worker) {
-  worker.onmessage = event => {
-    if (event.data.type === 'ready') {
-      state.workerReady = true;
-      $('catalogCount').textContent = event.data.count.toLocaleString('es-AR');
-      return;
-    }
-    if (event.data.type === 'results' && event.data.requestId === state.requestId) {
-      state.results = event.data.results;
-      $('searchMeta').textContent = `${event.data.results.length} resultados en ${event.data.elapsedMs} ms`;
-      renderSuggestions();
-    }
+// ---------------------------------------------------------
+//  Búsqueda de productos: Web Worker con fallback síncrono
+// ---------------------------------------------------------
+let catalog = sampleProducts;
+let fallbackIndex = buildSearchIndex(catalog);
+let worker = null, workerReady = false, reqId = 0;
+const pending = new Map();
+if ('Worker' in window) {
+  try {
+    worker = new Worker('./search-worker.js', { type: 'module' });
+    worker.onmessage = e => {
+      if (e.data.type === 'ready') { workerReady = true; return; }
+      if (e.data.type === 'results') {
+        const resolve = pending.get(e.data.requestId);
+        if (resolve) { pending.delete(e.data.requestId); resolve({ results: e.data.results, elapsedMs: e.data.elapsedMs }); }
+      }
+    };
+  } catch { worker = null; }
+}
+
+// Carga el catálogo real (si existe) o el de ejemplo, y prepara la búsqueda.
+async function loadCatalog() {
+  let loaded = [];
+  try { loaded = await store.listProducts(); } catch { loaded = []; }
+  catalog = (loaded && loaded.length) ? loaded : sampleProducts;
+  fallbackIndex = buildSearchIndex(catalog);
+  if (worker) { workerReady = false; worker.postMessage({ type: 'init', products: catalog }); }
+}
+
+function search(query) {
+  if (worker && workerReady) {
+    reqId += 1;
+    const id = reqId;
+    return new Promise(resolve => { pending.set(id, resolve); worker.postMessage({ type: 'search', query, requestId: id, limit: 30 }); });
+  }
+  const t = performance.now();
+  return Promise.resolve({ results: searchProducts(query, fallbackIndex, 30), elapsedMs: Math.round(performance.now() - t) });
+}
+
+// ---------------------------------------------------------
+//  Datos
+// ---------------------------------------------------------
+async function loadData(user) {
+  const [shortages, orders, suppliers] = await Promise.all([
+    store.listShortages(), store.listOrders(), store.listSuppliers(), loadCatalog()
+  ]);
+  state.shortages = shortages;
+  state.orders = orders;
+  state.suppliers = suppliers;
+  state.users = canManageUsers(user.role) ? await store.listUsers() : [];
+}
+
+function buildCtx() {
+  const user = currentUser;
+  return {
+    user, mode: getMode(), businessName: BUSINESS_NAME, state, ui: state.ui, search, signIn, signUp,
+    async saveShortage(input) {
+      await store.saveShortage({ ...input, createdBy: user.fullName, createdById: user.id !== 'demo' ? user.id : null });
+      state.shortages = await store.listShortages();
+    },
+    async updateShortageStatus(id, status) {
+      await store.updateShortage(id, { status });
+      state.shortages = await store.listShortages();
+    },
+    async createOrder({ supplier, shortages }) {
+      await store.createOrderFromShortages({ supplier, shortages, user });
+      state.shortages = await store.listShortages();
+      state.orders = await store.listOrders();
+      renderView();
+    },
+    async updateOrderStatus(id, status) {
+      await store.updateOrder(id, { status });
+      state.orders = await store.listOrders();
+      renderView();
+    },
+    async setUserRole(id, role) { await store.setUserRole(id, role); },
+    async setUserActive(id, active) { await store.setUserActive(id, active); },
+    catalogCount: catalog.length,
+    async replaceProducts(products) { const n = await store.replaceProducts(products); await loadCatalog(); return n; },
+    async refresh() { await loadData(user); renderView(); }
   };
 }
 
-function requestSearch() {
-  state.selectedProduct = null;
-  $('selected').textContent = 'Sin producto seleccionado. Si guardas así quedará pendiente de clasificar.';
-  const query = $('search').value;
-  if (!query.trim()) {
-    state.results = [];
-    $('searchMeta').textContent = '';
-    return renderSuggestions();
-  }
-  state.requestId += 1;
-  if (state.workerReady) worker.postMessage({ query, requestId: state.requestId, limit: 30 });
-  else {
-    const started = performance.now();
-    state.results = searchProducts(query, state.fallbackIndex, 30);
-    $('searchMeta').textContent = `${state.results.length} resultados en ${Math.round(performance.now() - started)} ms`;
-    renderSuggestions();
-  }
+// ---------------------------------------------------------
+//  Render
+// ---------------------------------------------------------
+const TABS = [
+  { id: 'faltantes', label: 'Faltantes' },
+  { id: 'pedidos', label: 'Pedidos' },
+  { id: 'importar', label: 'Catálogo', needs: u => canManageUsers(u.role) },
+  { id: 'usuarios', label: 'Usuarios', needs: u => canManageUsers(u.role) }
+];
+
+function renderView() {
+  const view = document.getElementById('view');
+  if (!view || !currentUser) return;
+  const ctx = buildCtx();
+  const admin = canManageUsers(currentUser.role);
+  if (state.view === 'pedidos') renderPedidos(view, ctx);
+  else if (state.view === 'usuarios' && admin) renderUsuarios(view, ctx);
+  else if (state.view === 'importar' && admin) renderImportar(view, ctx);
+  else { state.view = 'faltantes'; renderFaltantes(view, ctx); }
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.toggle('active', t.dataset.view === state.view));
 }
 
-function renderSuggestions() {
-  $('suggestions').innerHTML = state.results.map(product => `<button class="suggestion" type="button" data-id="${product.id}"><strong>${product.officialName}</strong><span>${product.brand} · ${product.category} · ${product.internalCode} · ${product.unit}</span><small>${product.aliases.slice(0, 4).join(' · ')}</small></button>`).join('');
-  document.querySelectorAll('.suggestion').forEach(node => node.addEventListener('click', () => {
-    state.selectedProduct = products.find(product => product.id === node.dataset.id);
-    $('unit').value = state.selectedProduct.unit;
-    $('selected').textContent = `Seleccionado: ${state.selectedProduct.officialName}`;
+function renderShell() {
+  const u = currentUser;
+  const tabs = TABS.filter(t => !t.needs || t.needs(u));
+  appEl.innerHTML = `
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">${escapeHtml(BUSINESS_NAME)}${getMode() === 'demo' ? ' · modo demostración' : ''}</p>
+        <h1>Gestión de ferretería</h1>
+      </div>
+      <div class="user-box">
+        <span><strong>${escapeHtml(u.fullName)}</strong><small>${escapeHtml(u.role)}</small></span>
+        <button id="logout" type="button">Salir</button>
+      </div>
+    </header>
+    <nav class="nav">${tabs.map(t => `<button class="nav-tab" data-view="${t.id}">${t.label}</button>`).join('')}</nav>
+    <main id="view"></main>`;
+
+  appEl.querySelectorAll('.nav-tab').forEach(tab => tab.addEventListener('click', () => {
+    state.view = tab.dataset.view;
+    renderView();
   }));
-}
-
-async function refreshShortages() {
-  state.shortages = await getAllShortages();
-  renderShortages();
-  renderMetrics();
-}
-
-function shortageMatchesFilters(item) {
-  const text = normalizeText($('filterText').value);
-  const status = $('filterStatus').value;
-  const urgency = $('filterUrgency').value;
-  const haystack = normalizeText(`${productLabel(item)} ${item.createdBy} ${item.location} ${item.notes} ${item.status} ${item.urgency}`);
-  return (!text || haystack.includes(text)) && (!status || item.status === status) && (!urgency || item.urgency === urgency);
-}
-
-function renderShortages() {
-  const rows = state.shortages.filter(shortageMatchesFilters).slice(0, 250);
-  $('shortages').innerHTML = rows.length ? rows.map(item => `<article class="row ${item.urgency === 'alta' ? 'urgent' : ''}"><div><strong>${productLabel(item)}</strong>${item.productId ? '' : '<span class="pill danger">pendiente de clasificar</span>'}</div><p>${item.quantity} ${item.unit} · urgencia ${item.urgency} · ${item.location || 'sin local'}</p><p class="muted">${item.createdBy} · ${new Date(item.createdAt).toLocaleString('es-AR')} ${item.notes ? '· ' + item.notes : ''}</p><select data-status="${item.id}" aria-label="Estado de ${productLabel(item)}">${STATUSES.map(option => `<option ${option === item.status ? 'selected' : ''}>${option}</option>`).join('')}</select></article>`).join('') : '<p class="empty">No hay faltantes con esos filtros.</p>';
-  document.querySelectorAll('[data-status]').forEach(node => node.addEventListener('change', async () => { await updateShortage(node.dataset.status, { status: node.value }); await refreshShortages(); }));
-}
-
-function renderMetrics() {
-  $('metricTotal').textContent = state.shortages.length;
-  $('metricPending').textContent = state.shortages.filter(item => item.status === 'pendiente').length;
-  $('metricUrgent').textContent = state.shortages.filter(item => item.urgency === 'alta' && item.status !== 'recibido').length;
-  $('metricUnclassified').textContent = state.shortages.filter(item => !item.productId).length;
-}
-
-async function handleSave() {
-  const query = $('search').value.trim();
-  const shortage = createShortage({
-    productId: state.selectedProduct?.id,
-    productSnapshot: state.selectedProduct,
-    unclassifiedText: query,
-    quantity: $('qty').value,
-    unit: $('unit').value || state.selectedProduct?.unit,
-    urgency: $('urgency').value,
-    notes: $('notes').value,
-    location: $('location').value,
-    createdBy: $('user').value
+  appEl.querySelector('#logout').addEventListener('click', async () => {
+    if (getMode() === 'demo') { toast('En modo demostración no hay sesión que cerrar.'); return; }
+    await signOut();
   });
-  await saveShortage(shortage);
-  $('search').value = '';
-  $('qty').value = 1;
-  $('notes').value = '';
-  state.selectedProduct = null;
-  state.results = [];
-  $('selected').textContent = 'Faltante guardado. Busca otro producto.';
-  renderSuggestions();
-  await refreshShortages();
+  renderView();
 }
 
-function renderProductsPreview() {
-  $('productsPreview').innerHTML = products.slice(0, 40).map(product => `<div class="product"><strong>${product.officialName}</strong><span>${product.brand} · ${product.category} · ${product.internalCode}</span></div>`).join('');
-  $('catalogCount').textContent = products.length.toLocaleString('es-AR');
+function renderInactive() {
+  appEl.innerHTML = `
+    <div class="auth-wrap"><div class="auth-card">
+      <h1>Cuenta sin acceso</h1>
+      <p class="muted">Tu cuenta todavía no fue activada por un administrador.</p>
+      <button class="primary-action" id="logout">Salir</button>
+    </div></div>`;
+  appEl.querySelector('#logout').addEventListener('click', () => signOut());
 }
 
-$('search').addEventListener('input', requestSearch);
-$('save').addEventListener('click', () => handleSave().catch(error => alert(error.message)));
-['filterText', 'filterStatus', 'filterUrgency'].forEach(id => $(id).addEventListener('input', renderShortages));
-renderProductsPreview();
-refreshShortages();
+async function handleUser(user) {
+  currentUser = user;
+  if (!user) { renderLogin(appEl, buildCtxForLogin()); return; }
+  if (user.active === false) { renderInactive(); return; }
+  await loadData(user);
+  renderShell();
+}
+
+function buildCtxForLogin() {
+  return { businessName: BUSINESS_NAME, signIn, signUp };
+}
+
+onAuthChange(handleUser);
+initAuth().catch(err => {
+  appEl.innerHTML = `<div class="auth-wrap"><div class="auth-card"><h1>Error de inicio</h1><p class="muted">${escapeHtml(err.message)}</p></div></div>`;
+});

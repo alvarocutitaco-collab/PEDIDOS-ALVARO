@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { createCatalog, products } from '../src/catalog.js';
 import { normalizeText, buildSearchIndex, searchProducts } from '../src/search.js';
-import { createShortage, STATUSES } from '../src/domain.js';
+import { createShortage, STATUSES, groupShortagesBySupplier, buildWhatsappText, createOrder, canChangeStatus, canManageUsers, SIN_PROVEEDOR } from '../src/domain.js';
 
 assert.equal(products.length, 8200);
 assert.equal(createCatalog(9000).length, 9000);
@@ -27,5 +27,70 @@ const unclassified = createShortage({ unclassifiedText: 'pieza rara', quantity: 
 assert.equal(unclassified.productId, null);
 assert.equal(unclassified.unclassifiedText, 'pieza rara');
 assert.deepEqual(STATUSES, ['pendiente', 'revisado', 'pedido', 'recibido', 'cancelado']);
+
+// El faltante deriva el proveedor principal del producto.
+assert.equal(classified.supplier, 'Aceros Centro');
+
+// Permisos por rol.
+assert.equal(canChangeStatus('encargado'), true);
+assert.equal(canChangeStatus('trabajador'), false);
+assert.equal(canManageUsers('administrador'), true);
+assert.equal(canManageUsers('encargado'), false);
+
+// Agrupar faltantes por proveedor (solo pendientes/revisados).
+const a = createShortage({ productId: 'p-00001', productSnapshot: products[0], quantity: 3 });
+const b = createShortage({ productId: 'p-00003', productSnapshot: products[2], quantity: 1 });
+const c = createShortage({ unclassifiedText: 'algo raro', quantity: 1 });
+const recibido = createShortage({ productId: 'p-00001', productSnapshot: products[0], quantity: 1, status: 'recibido' });
+const groups = groupShortagesBySupplier([a, b, c, recibido]);
+assert.equal(groups.length, 3);
+assert.equal(groups.find(g => g.supplier === 'Aceros Centro').items.length, 1);
+assert.equal(groups[groups.length - 1].supplier, SIN_PROVEEDOR);
+
+// Pedido + texto para WhatsApp.
+const order = createOrder({ supplier: 'Aceros Centro', items: [{ label: 'Clavo comun 1 pulgada', quantity: 3, unit: 'kg' }] });
+assert.equal(order.status, 'borrador');
+assert.equal(order.items.length, 1);
+const wa = buildWhatsappText(order, 'Ferreteria Alvaro');
+assert.ok(wa.includes('Ferreteria Alvaro'));
+assert.ok(wa.includes('Aceros Centro'));
+assert.ok(wa.includes('Clavo comun 1 pulgada — 3 kg'));
+
+assert.throws(() => createOrder({ items: [] }), /al menos un faltante/);
+
+// --- Importación de catálogo ---
+import { parseTable, guessMapping, looksLikeHeader, buildProducts } from '../src/import-parse.js';
+
+const tsv = 'DESCRIPCION\tMARCA\tP VENT\tUND\nCLAVO 1 PULG\tGENERICO\t2.00\tKG\nSOGA DRIZA 3/16\tFORTE\t24.50\tMTR';
+const rowsTsv = parseTable(tsv);
+assert.equal(rowsTsv.length, 3);
+assert.equal(rowsTsv[1][0], 'CLAVO 1 PULG');
+assert.equal(looksLikeHeader(rowsTsv), true);
+const mapTsv = guessMapping(rowsTsv[0]);
+assert.equal(mapTsv.description, 0);
+assert.equal(mapTsv.brand, 1);
+assert.equal(mapTsv.salePrice, 2);
+assert.equal(mapTsv.unit, 3);
+const prods = buildProducts(rowsTsv, mapTsv, true);
+assert.equal(prods.length, 2);
+assert.equal(prods[0].officialName, 'CLAVO 1 PULG');
+assert.equal(prods[0].brand, 'GENERICO');
+assert.equal(prods[0].salePrice, 2);
+assert.equal(prods[0].unit, 'KG');
+assert.equal(prods[1].salePrice, 24.5);
+
+// CSV con punto y coma y precio con coma decimal
+const csv = 'descripcion;marca;precio;unidad\nTUERCA;BREMEN;1,50;UNI';
+const rowsCsv = parseTable(csv);
+const prodsCsv = buildProducts(rowsCsv, guessMapping(rowsCsv[0]), true);
+assert.equal(prodsCsv[0].salePrice, 1.5);
+assert.equal(prodsCsv[0].brand, 'BREMEN');
+
+// Sin encabezado, mapeo manual
+const noHeader = parseTable('MARTILLO\tSTANLEY\t35');
+const prodsNoHeader = buildProducts(noHeader, { description: 0, brand: 1, salePrice: 2, unit: -1, stock: -1, code: -1 }, false);
+assert.equal(prodsNoHeader.length, 1);
+assert.equal(prodsNoHeader[0].officialName, 'MARTILLO');
+assert.equal(prodsNoHeader[0].unit, 'unidad');
 
 console.log('All tests passed');

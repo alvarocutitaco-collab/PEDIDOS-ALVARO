@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#0f766e">
+  <title>Faltantes | Pedidos Alvaro</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="app-header">
+    <div>
+      <p class="eyebrow">Operación ferretera</p>
+      <h1>Cuaderno digital de faltantes</h1>
+      <p>Diseñado para celulares, catálogo grande y registro en segundos.</p>
+    </div>
+    <div class="catalog-badge"><strong id="catalogCount">0</strong><span>productos cargados</span></div>
+  </header>
+
+  <main class="layout">
+    <section class="panel form-panel" aria-labelledby="new-shortage-title">
+      <h2 id="new-shortage-title">Agregar faltante</h2>
+      <div class="field-grid">
+        <label>Usuario<input id="user" placeholder="Nombre del trabajador" autocomplete="name"></label>
+        <label>Buscar producto oficial, alias, código o proveedor<input id="search" autocomplete="off" placeholder="Ej: clavo chico, CLA-1, Alba..."></label>
+      </div>
+      <p id="searchMeta" class="muted"></p>
+      <div id="suggestions" class="suggestions" aria-live="polite"></div>
+      <div class="field-grid three">
+        <label>Cantidad<input id="qty" type="number" min="0.01" step="0.01" value="1"></label>
+        <label>Unidad<input id="unit" placeholder="unidad, caja, kg"></label>
+        <label>Urgencia<select id="urgency"><option>normal</option><option>alta</option><option>baja</option></select></label>
+      </div>
+      <label>Local / área<input id="location" placeholder="Mostrador, depósito, sucursal..."></label>
+      <label>Observación opcional<textarea id="notes" rows="2" placeholder="Ej: cliente lo pidió, queda uno en góndola..."></textarea></label>
+      <button id="save" class="primary-action">Guardar faltante</button>
+      <p id="selected" class="muted">Sin producto seleccionado. Si guardas así quedará pendiente de clasificar.</p>
+    </section>
+
+    <section class="panel metrics-panel" aria-label="Resumen operativo">
+      <div class="metric"><strong id="metricTotal">0</strong><span>Total</span></div>
+      <div class="metric"><strong id="metricPending">0</strong><span>Pendientes</span></div>
+      <div class="metric"><strong id="metricUrgent">0</strong><span>Urgentes</span></div>
+      <div class="metric"><strong id="metricUnclassified">0</strong><span>Sin clasificar</span></div>
+    </section>
+
+    <section class="panel list-panel" aria-labelledby="shortages-title">
+      <div class="panel-title-row">
+        <h2 id="shortages-title">Faltantes</h2>
+        <span class="muted">Muestra hasta 250 resultados filtrados</span>
+      </div>
+      <div class="filters">
+        <input id="filterText" placeholder="Filtrar por producto, usuario, local...">
+        <select id="filterStatus"><option value="">Todos los estados</option><option>pendiente</option><option>revisado</option><option>pedido</option><option>recibido</option><option>cancelado</option></select>
+        <select id="filterUrgency"><option value="">Todas las urgencias</option><option>alta</option><option>normal</option><option>baja</option></select>
+      </div>
+      <div id="shortages" class="shortages"></div>
+    </section>
+
+    <section class="panel catalog-panel" aria-labelledby="catalog-title">
+      <div class="panel-title-row">
+        <h2 id="catalog-title">Catálogo oficial y alias</h2>
+        <span class="muted">Vista previa; la búsqueda usa todo el catálogo</span>
+      </div>
+      <div id="productsPreview" class="products-preview"></div>
+    </section>
+  </main>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

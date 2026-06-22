@@ -1,10 +1,11 @@
 import { sampleProducts } from './catalog.js';
 import { buildSearchIndex, searchProducts } from './search.js';
-import { BUSINESS_NAME } from './config.js';
+import { BUSINESS_NAME, isSupabaseConfigured, demoChosen, resetConnection } from './config.js';
 import { initAuth, onAuthChange, signIn, signUp, signOut, getMode } from './auth.js';
 import * as store from './storage.js';
 import { canManageUsers, canManageOrders } from './domain.js';
 import { renderLogin } from './views/login.js';
+import { renderConnect } from './views/connect.js';
 import { renderFaltantes } from './views/faltantes.js';
 import { renderPedidos } from './views/pedidos.js';
 import { renderUsuarios } from './views/usuarios.js';
@@ -131,6 +132,7 @@ function renderShell() {
       </div>
       <div class="user-box">
         <span><strong>${escapeHtml(u.fullName)}</strong><small>${escapeHtml(u.role)}</small></span>
+        ${getMode() === 'demo' ? '<button id="connect-cloud" type="button">Conectar a la nube</button>' : ''}
         <button id="logout" type="button">Salir</button>
       </div>
     </header>
@@ -145,6 +147,8 @@ function renderShell() {
     if (getMode() === 'demo') { toast('En modo demostración no hay sesión que cerrar.'); return; }
     await signOut();
   });
+  const connectBtn = appEl.querySelector('#connect-cloud');
+  if (connectBtn) connectBtn.addEventListener('click', () => { resetConnection(); location.reload(); });
   renderView();
 }
 
@@ -170,7 +174,11 @@ function buildCtxForLogin() {
   return { businessName: BUSINESS_NAME, signIn, signUp };
 }
 
-onAuthChange(handleUser);
-initAuth().catch(err => {
-  appEl.innerHTML = `<div class="auth-wrap"><div class="auth-card"><h1>Error de inicio</h1><p class="muted">${escapeHtml(err.message)}</p></div></div>`;
-});
+function boot() {
+  if (!isSupabaseConfigured && !demoChosen()) { renderConnect(appEl); return; }
+  onAuthChange(handleUser);
+  initAuth().catch(err => {
+    appEl.innerHTML = `<div class="auth-wrap"><div class="auth-card"><h1>Error de inicio</h1><p class="muted">${escapeHtml(err.message)}</p></div></div>`;
+  });
+}
+boot();

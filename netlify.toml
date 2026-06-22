@@ -1,0 +1,5 @@
+# Configuración de publicación para Netlify.
+# La app es estática y vive en la carpeta src/.
+[build]
+  publish = "src"
+  command = ""

@@ -1,4 +1,5 @@
 import { escapeHtml, toast } from '../ui.js';
+import { resetConnection } from '../config.js';
 
 export function renderLogin(root, ctx) {
   root.innerHTML = `
@@ -26,8 +27,14 @@ export function renderLogin(root, ctx) {
           <button class="primary-action" type="submit">Crear cuenta</button>
           <p class="muted">Después de crear la cuenta, un administrador te asigna el rol.</p>
         </form>
+
+        <p class="muted" style="margin-top:14px">¿Datos de conexión equivocados?
+          <button id="reconnect" class="linklike" type="button">Reconfigurar</button>
+        </p>
       </div>
     </div>`;
+
+  root.querySelector('#reconnect').addEventListener('click', () => { resetConnection(); location.reload(); });
 
   const formIn = root.querySelector('#form-in');
   const formUp = root.querySelector('#form-up');

@@ -89,6 +89,7 @@ textarea{resize:vertical}
 .tab{flex:1;border:1px solid var(--line);background:#f8fafc;border-radius:12px;padding:10px;font-weight:700;cursor:pointer}
 .tab.active{background:var(--brand);color:#fff;border-color:var(--brand)}
 .auth-form{display:grid;gap:4px}
+.linklike{width:auto;display:inline;border:0;background:none;color:var(--brand);font-weight:700;text-decoration:underline;cursor:pointer;padding:0}
 
 /* Importar catálogo */
 .inline{display:flex;align-items:center;gap:8px;font-weight:600;margin:8px 0}

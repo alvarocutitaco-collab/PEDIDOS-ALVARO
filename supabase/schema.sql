@@ -49,6 +49,20 @@ create table if not exists public.suppliers (
   updated_at   timestamptz not null default now()
 );
 
+-- ---------- Catálogo de productos (importado del sistema actual) ----------
+create table if not exists public.products (
+  id          text primary key,
+  description text not null,
+  brand       text,
+  sale_price  numeric,
+  unit        text default 'unidad',
+  stock       numeric,
+  code        text,
+  active      boolean not null default true,
+  updated_at  timestamptz not null default now()
+);
+create index if not exists products_brand_idx on public.products (brand);
+
 -- ---------- Faltantes (cuaderno digital) ----------
 create table if not exists public.shortages (
   id                 text primary key,
@@ -101,6 +115,7 @@ create table if not exists public.purchase_order_items (
 --  gestionan usuarios.
 -- ============================================================
 alter table public.profiles            enable row level security;
+alter table public.products            enable row level security;
 alter table public.suppliers           enable row level security;
 alter table public.shortages           enable row level security;
 alter table public.purchase_orders     enable row level security;
@@ -117,7 +132,7 @@ create policy profiles_admin_write on public.profiles for update to authenticate
 do $$
 declare t text;
 begin
-  foreach t in array array['suppliers','shortages','purchase_orders','purchase_order_items'] loop
+  foreach t in array array['products','suppliers','shortages','purchase_orders','purchase_order_items'] loop
     execute format('drop policy if exists %1$s_all on public.%1$s', t);
     execute format('create policy %1$s_all on public.%1$s for all to authenticated using (true) with check (true)', t);
   end loop;

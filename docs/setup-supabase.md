@@ -76,4 +76,14 @@ En Netlify o Vercel: "Import from Git", elegí este repositorio y poné como car
 
 - **¿Cuánto cuesta?** El plan gratis de Supabase y de Netlify alcanza de sobra para una ferretería. Si algún día crece mucho, se pasa a un plan pago bajo.
 - **¿Pierdo los datos del modo demostración al conectar Supabase?** Sí, esos eran solo de prueba en tu dispositivo. Los datos reales empiezan desde Supabase.
-- **¿Y el catálogo de productos real (de mi facturador)?** Es la siguiente fase: importar tus productos desde un Excel/exportación del facturador. Por ahora el buscador usa un catálogo de ejemplo para que puedas registrar faltantes.
+## Importar tu catálogo real
+
+La app trae un catálogo de ejemplo solo para probar. Para cargar tus productos reales:
+
+1. Entrá como **administrador** y abrí la pestaña **Catálogo**.
+2. En tu sistema actual, seleccioná la lista de productos y **copiala** (o exportá un CSV).
+3. **Pegá** las filas en el recuadro (o subí el archivo CSV) y tocá **Analizar datos**.
+4. La app detecta sola las columnas (Descripción, Marca, Precio venta, Unidad, Stock). Revisá que estén bien con los menús desplegables.
+5. Tocá **Importar**. Listo: el buscador de faltantes ya usa tus productos reales con su precio.
+
+> Solo se necesita Descripción, Marca y Precio de venta. El precio de compra no hace falta.

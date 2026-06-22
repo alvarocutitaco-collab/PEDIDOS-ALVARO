@@ -37,4 +37,6 @@ export function createCatalog(size = 8200) {
 }
 
 export const products = createCatalog();
+// Catálogo de ejemplo usado solo cuando todavía no se importó el catálogo real.
+export const sampleProducts = products;
 export { baseProducts };

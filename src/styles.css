@@ -90,6 +90,15 @@ textarea{resize:vertical}
 .tab.active{background:var(--brand);color:#fff;border-color:var(--brand)}
 .auth-form{display:grid;gap:4px}
 
+/* Importar catálogo */
+.inline{display:flex;align-items:center;gap:8px;font-weight:600;margin:8px 0}
+.inline input{width:auto}
+.map-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-bottom:12px}
+.preview-table{overflow:auto;border:1px solid var(--line);border-radius:12px;margin:8px 0 14px}
+.preview-table table{border-collapse:collapse;width:100%;font-size:.88rem}
+.preview-table th,.preview-table td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+.preview-table th{background:#f8fafc;position:sticky;top:0}
+
 /* Toast */
 .toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,20px);background:#0f172a;color:#fff;padding:12px 18px;border-radius:12px;font-weight:600;opacity:0;pointer-events:none;transition:.25s;z-index:50;max-width:90vw}
 .toast.show{opacity:1;transform:translate(-50%,0)}

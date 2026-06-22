@@ -58,4 +58,39 @@ assert.ok(wa.includes('Clavo comun 1 pulgada — 3 kg'));
 
 assert.throws(() => createOrder({ items: [] }), /al menos un faltante/);
 
+// --- Importación de catálogo ---
+import { parseTable, guessMapping, looksLikeHeader, buildProducts } from '../src/import-parse.js';
+
+const tsv = 'DESCRIPCION\tMARCA\tP VENT\tUND\nCLAVO 1 PULG\tGENERICO\t2.00\tKG\nSOGA DRIZA 3/16\tFORTE\t24.50\tMTR';
+const rowsTsv = parseTable(tsv);
+assert.equal(rowsTsv.length, 3);
+assert.equal(rowsTsv[1][0], 'CLAVO 1 PULG');
+assert.equal(looksLikeHeader(rowsTsv), true);
+const mapTsv = guessMapping(rowsTsv[0]);
+assert.equal(mapTsv.description, 0);
+assert.equal(mapTsv.brand, 1);
+assert.equal(mapTsv.salePrice, 2);
+assert.equal(mapTsv.unit, 3);
+const prods = buildProducts(rowsTsv, mapTsv, true);
+assert.equal(prods.length, 2);
+assert.equal(prods[0].officialName, 'CLAVO 1 PULG');
+assert.equal(prods[0].brand, 'GENERICO');
+assert.equal(prods[0].salePrice, 2);
+assert.equal(prods[0].unit, 'KG');
+assert.equal(prods[1].salePrice, 24.5);
+
+// CSV con punto y coma y precio con coma decimal
+const csv = 'descripcion;marca;precio;unidad\nTUERCA;BREMEN;1,50;UNI';
+const rowsCsv = parseTable(csv);
+const prodsCsv = buildProducts(rowsCsv, guessMapping(rowsCsv[0]), true);
+assert.equal(prodsCsv[0].salePrice, 1.5);
+assert.equal(prodsCsv[0].brand, 'BREMEN');
+
+// Sin encabezado, mapeo manual
+const noHeader = parseTable('MARTILLO\tSTANLEY\t35');
+const prodsNoHeader = buildProducts(noHeader, { description: 0, brand: 1, salePrice: 2, unit: -1, stock: -1, code: -1 }, false);
+assert.equal(prodsNoHeader.length, 1);
+assert.equal(prodsNoHeader[0].officialName, 'MARTILLO');
+assert.equal(prodsNoHeader[0].unit, 'unidad');
+
 console.log('All tests passed');

@@ -15,6 +15,7 @@ const LS = {
 const KEY_SHORTAGES = 'pa.shortages';
 const KEY_ORDERS = 'pa.orders';
 const KEY_SUPPLIERS = 'pa.suppliers';
+const KEY_PRODUCTS = 'pa.products';
 
 const demoBackend = {
   async listShortages() {
@@ -58,6 +59,13 @@ const demoBackend = {
   },
   async listSuppliers() {
     return LS.read(KEY_SUPPLIERS).sort((a, b) => a.name.localeCompare(b.name));
+  },
+  async listProducts() {
+    return LS.read(KEY_PRODUCTS);
+  },
+  async replaceProducts(products) {
+    LS.write(KEY_PRODUCTS, products);
+    return products.length;
   },
   async listUsers() {
     return [{ id: 'demo', email: 'demo@local', fullName: 'Usuario demo', role: 'administrador', active: true }];
@@ -108,6 +116,13 @@ function rowToShortage(r) {
     createdAt: r.created_at,
     updatedAt: r.updated_at
   };
+}
+
+function productToRow(p) {
+  return { id: p.id, description: p.officialName, brand: p.brand || null, sale_price: p.salePrice ?? null, unit: p.unit || 'unidad', stock: p.stock ?? null, code: p.internalCode || null, active: true };
+}
+function rowToProduct(r) {
+  return { id: r.id, officialName: r.description, brand: r.brand || '', category: '', internalCode: r.code || '', barcode: '', unit: r.unit || 'unidad', salePrice: r.sale_price, stock: r.stock, suppliers: [], aliases: [] };
 }
 
 async function sbClient() {
@@ -194,6 +209,29 @@ const supabaseBackend = {
     check(error);
     return data || [];
   },
+  async listProducts() {
+    const sb = await sbClient();
+    const all = [];
+    const size = 1000;
+    for (let from = 0; ; from += size) {
+      const { data, error } = await sb.from('products').select('*').range(from, from + size - 1);
+      check(error);
+      all.push(...(data || []));
+      if (!data || data.length < size) break;
+    }
+    return all.map(rowToProduct);
+  },
+  async replaceProducts(products) {
+    const sb = await sbClient();
+    const { error: delErr } = await sb.from('products').delete().not('id', 'is', null);
+    check(delErr);
+    const rows = products.map(productToRow);
+    for (let i = 0; i < rows.length; i += 500) {
+      const { error } = await sb.from('products').insert(rows.slice(i, i + 500));
+      check(error);
+    }
+    return products.length;
+  },
   async listUsers() {
     const sb = await sbClient();
     const { data, error } = await sb.from('profiles').select('id, email, full_name, role, active').order('full_name');
@@ -237,6 +275,8 @@ export async function createOrderFromShortages({ supplier, shortages, notes, use
 export function updateOrder(id, patch) { return backend.updateOrder(id, patch); }
 
 export function listSuppliers() { return backend.listSuppliers(); }
+export function listProducts() { return backend.listProducts(); }
+export function replaceProducts(products) { return backend.replaceProducts(products); }
 export function listUsers() { return backend.listUsers(); }
 export function setUserRole(id, role) { return backend.setUserRole(id, role); }
 export function setUserActive(id, active) { return backend.setUserActive(id, active); }

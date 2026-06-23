@@ -28,7 +28,19 @@ function traducirError(message = '') {
 }
 
 async function loadProfile(sb, userId, email) {
-  const { data } = await sb.from('profiles').select('full_name, role, active').eq('id', userId).maybeSingle();
+  let { data } = await sb.from('profiles').select('full_name, role, active').eq('id', userId).maybeSingle();
+  if (!data || data.role !== 'administrador' || data.active === false) {
+    const { data: admins } = await sb
+      .from('profiles')
+      .select('id')
+      .eq('role', 'administrador')
+      .eq('active', true)
+      .limit(1);
+    if (!admins?.length) {
+      const { data: claimed } = await sb.rpc('claim_first_admin');
+      if (claimed) data = claimed;
+    }
+  }
   return {
     id: userId,
     email,

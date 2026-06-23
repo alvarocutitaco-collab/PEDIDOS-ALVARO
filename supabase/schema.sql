@@ -36,6 +36,46 @@ returns text language sql stable security definer set search_path = public as $$
   select role from public.profiles where id = auth.uid();
 $$;
 
+-- Permite recuperar el arranque inicial si todavía no hay ningún
+-- administrador activo. Solo promueve al usuario autenticado actual.
+create or replace function public.claim_first_admin()
+returns public.profiles
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  claimed public.profiles;
+begin
+  if auth.uid() is null then
+    raise exception 'Debes iniciar sesión para reclamar el administrador inicial.';
+  end if;
+
+  if exists (
+    select 1 from public.profiles
+    where role = 'administrador' and active = true
+  ) then
+    raise exception 'Ya existe un administrador activo.';
+  end if;
+
+  update public.profiles
+     set role = 'administrador',
+         active = true
+   where id = auth.uid()
+   returning * into claimed;
+
+  if claimed.id is null then
+    insert into public.profiles (id, email, full_name, role, active)
+    select id, email, coalesce(raw_user_meta_data->>'full_name', email), 'administrador', true
+      from auth.users
+     where id = auth.uid()
+    returning * into claimed;
+  end if;
+
+  return claimed;
+end;
+$$;
+
 -- ---------- Proveedores ----------
 create table if not exists public.suppliers (
   id           uuid primary key default gen_random_uuid(),
@@ -143,5 +183,6 @@ end $$;
 --  Cambiá el email por el tuyo y ejecutá esta línea una vez,
 --  después de haber creado tu cuenta desde la app.
 -- ============================================================
--- update public.profiles set role = 'administrador'
--- where id = (select id from auth.users where email = 'tu-email@ejemplo.com');
+-- update public.profiles
+--    set role = 'administrador', active = true
+--  where id = (select id from auth.users where email = 'tu-email@ejemplo.com');

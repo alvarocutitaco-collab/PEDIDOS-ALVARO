@@ -40,14 +40,15 @@ Esta guía te lleva de la app en "modo demostración" a una app **real, comparti
 1. Abrí la app y entrá a **Crear cuenta**: poné tu nombre, email y contraseña.
    - Por defecto Supabase pide confirmar el email. Revisá tu correo y confirmá.
    - (Opcional, para no confirmar emails al inicio: en Supabase **Authentication → Providers → Email**, desactivá *Confirm email*.)
-2. Volvé a Supabase → **SQL Editor** y ejecutá esta línea, cambiando el email por el tuyo:
+2. Cerrá sesión y volvé a entrar en la app. Si todavía no existe ningún administrador activo, la app convierte automáticamente tu cuenta en **administrador** y ves la pestaña **Usuarios**.
 
-   ```sql
-   update public.profiles set role = 'administrador'
-   where id = (select id from auth.users where email = 'tu-email@ejemplo.com');
-   ```
-
-3. Cerrá sesión y volvé a entrar en la app. Ya sos **administrador** y ves la pestaña **Usuarios**.
+> Si antes tocaste la tabla y quedaste sin acceso, volvé a copiar y ejecutar el archivo completo `supabase/schema.sql` en Supabase → **SQL Editor**. Después iniciá sesión otra vez. Si necesitás corregirlo manualmente, ejecutá este SQL cambiando el email por el tuyo:
+>
+> ```sql
+> update public.profiles
+>    set role = 'administrador', active = true
+>  where id = (select id from auth.users where email = 'tu-email@ejemplo.com');
+> ```
 
 ## Paso 5 — Sumar a tus empleados
 
